@@ -2,3 +2,7 @@
 	path = vendor/Babble
 	url = https://github.com/zmughal/Babble.git
 	branch = v0.090.007_01
+[submodule "ppp"]
+	path = vendor/PPP
+	url = https://github.com/zmughal-experiment/perl-parsing-panoply.git
+	branch = main
