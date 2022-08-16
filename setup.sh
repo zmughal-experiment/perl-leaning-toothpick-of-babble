@@ -2,10 +2,12 @@
 
 CURDIR=`dirname "$0"`
 
+export PERL5LIB="vendor/Babble/lib:vendor/PPP/lib"
+
 BABBLE_FILTER() {
 	PLUGINS="$1"; shift
 	FILE="$1"; shift
-	perl -I ../Babble/lib -MBabble::Filter="$PLUGINS" \
+	perl -MBabble::Filter="$PLUGINS" \
 		 -0777 -pe babble $FILE | sponge $FILE
 }
 export -f BABBLE_FILTER
@@ -16,15 +18,25 @@ export -f BABBLE_FILTER
 for dist_module in \
 			Getopt::Long::Descriptive \
 			App::Cmd \
+			Mixin::Linewise \
 			Dist::Zilla \
+			Perl::PrereqScanner \
+			String::Formatter \
+			MooseX::OneArgNew \
+			Role::Identifiable \
+			MooseX::SetOnce \
+			Config::MVP \
+			Config::MVP::Reader::INI \
+			CPAN::Uploader \
 		; do
 	dist=work/$(echo $dist_module | sed 's/::/-/g' )
 
 	TAG='base';
 	if [ ! -d $dist ]; then
-		git-cpan clone --latest --norepository $dist_module
+		git-cpan clone --latest --norepository $dist_module $dist
 		git -C $dist tag $TAG
 	else
+		if [ -f $dist/Makefile ]; then make -C $dist clean; fi
 		git -C $dist checkout main
 		git -C $dist reset --hard $TAG
 	fi
@@ -42,7 +54,6 @@ for dist_module in \
 	if true; then
 		echo -n "Removing Perl version..."
 		TAG='perl-version'
-		#( cd $dist && cs --yes 'use v?5[.0-9]*;$' -r '#use v5;' ) 2>&1 >/dev/null
 		find $dist -type f | grep -v '/corpus/' | xargs perl -pi -e 's/^use \s+ v?5[.0-9]* \s* ; $/#$&/x'
 		find $dist -type f | xargs perl -pi -e "s/^ no \s+ feature \s+ 'switch'; \s+ $/#$&/x"
 		find $dist -type f -name 'Makefile.PL' | xargs perl -pi -e 's/^ .* MIN_PERL_VERSION .* $/#$&/x'
@@ -73,7 +84,17 @@ for dist_module in \
 
 	# Run tests
 	#( cd $dist && prove -lr t )
-	( cd $dist ; if [ -d lib ]; then export PERL5LIB=$(pwd)/lib; fi; yath -j4 -q )
+	#( cd $dist ; if [ -d lib ]; then export PERL5LIB=$(pwd)/lib; fi; yath -j4 -q )
 done
-BABBLE_FILTER ::DefinedOr,::PostfixDeref  Dist-Zilla/t/plugins/archive_builder.t
-BABBLE_FILTER ::DefinedOr  Dist-Zilla/t/plugins/cpanfile.t
+
+perl -pi -e 's/"feature" =>/#$&/' work/Dist-Zilla/Makefile.PL
+BABBLE_FILTER ::DefinedOr,::PostfixDeref  work/Dist-Zilla/t/plugins/archive_builder.t
+BABBLE_FILTER ::DefinedOr  work/Dist-Zilla/t/plugins/cpanfile.t
+perl -MBabble::Grammar -MRole::Tiny -MBabble::Filter=::DefinedOr -0777 -pe 'Role::Tiny->apply_roles_to_package( qw(Babble::Grammar), qw(PPP::Babble::Grammar::Role::TryTiny) ); babble' work/Dist-Zilla/lib/Dist/Zilla.pm | sponge work/Dist-Zilla/lib/Dist/Zilla.pm
+perl -MBabble::Grammar -MRole::Tiny -MBabble::Filter=::PostfixDeref -0777 -pe 'Role::Tiny->apply_roles_to_package( qw(Babble::Grammar), qw(PPP::Babble::Grammar::Role::TryTiny) ); babble' work/Dist-Zilla/lib/Dist/Zilla/Dist/Builder.pm | sponge work/Dist-Zilla/lib/Dist/Zilla/Dist/Builder.pm
+git -C work/Dist-Zilla add . && git -C work/Dist-Zilla commit -q -m 'Apply extra' --allow-empty
+git -C work/Dist-Zilla tag -f extra-pass
+
+perl -pi -e 's/^#(\Quse 5.008;\E)$/$1/' work/Perl-PrereqScanner/lib/Perl/PrereqScanner.pm
+git -C work/Perl-PrereqScanner add . && git -C work/Perl-PrereqScanner commit -q -m 'Apply extra' --allow-empty
+git -C work/Perl-PrereqScanner tag -f extra-pass
