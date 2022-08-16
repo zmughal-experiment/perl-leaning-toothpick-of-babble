@@ -18,7 +18,7 @@ for dist_module in \
 			App::Cmd \
 			Dist::Zilla \
 		; do
-	dist=$(echo $dist_module | sed 's/::/-/g' )
+	dist=work/$(echo $dist_module | sed 's/::/-/g' )
 
 	TAG='base';
 	if [ ! -d $dist ]; then
