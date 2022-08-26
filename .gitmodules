@@ -6,3 +6,7 @@
 	path = vendor/PPP
 	url = https://github.com/zmughal-experiment/perl-parsing-panoply.git
 	branch = main
+[submodule "metacpan-examples"]
+	path = vendor/metacpan-examples
+	url = https://github.com/metacpan/metacpan-examples
+	branch = master
