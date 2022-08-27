@@ -18,6 +18,7 @@ use version 0.77;
 use CPAN::Meta::Requirements;
 use List::Util qw(first uniqstr);
 
+use Text::Trim qw(trim);
 use Path::Tiny;
 use Capture::Tiny qw(capture_stdout);
 use Text::CSV_XS qw( csv );
@@ -110,22 +111,29 @@ sub main() {
     local $ENV{IPC_R_OUTPUT_PLOT_DEVICE} = $plot_device;
     local $ENV{IPC_R_OUTPUT_PLOT_FILE}   = "$plot_file";
     local $ENV{IPC_R_OUTPUT_WIDTH_IN}    = 11;
+    local $ENV{IPC_R_OUTPUT_CAPTION}     = "(@{[ trim(`git describe  --tags`) ]}:@{[ path($0) ]})";
     system(
       qw(R -e), <<~'R'
         library(ggplot2)
         library(ggcharts)
+        library(parsedate)
 
-        input_data_file    <- Sys.getenv('IPC_R_INPUT_CSV')
-        output_plot_device <- Sys.getenv('IPC_R_OUTPUT_PLOT_DEVICE')
-        output_plot_file   <- Sys.getenv('IPC_R_OUTPUT_PLOT_FILE')
-        output_plot_width  <- as.numeric(Sys.getenv('IPC_R_OUTPUT_WIDTH_IN'))
+        input_data_file     <- Sys.getenv('IPC_R_INPUT_CSV')
+        output_plot_device  <- Sys.getenv('IPC_R_OUTPUT_PLOT_DEVICE')
+        output_plot_file    <- Sys.getenv('IPC_R_OUTPUT_PLOT_FILE')
+        output_plot_width   <- as.numeric(Sys.getenv('IPC_R_OUTPUT_WIDTH_IN'))
+        output_plot_caption <- Sys.getenv('IPC_R_OUTPUT_CAPTION')
 
         print(paste('Reading from file', input_data_file))
         df <- read.csv(input_data_file,  stringsAsFactors = FALSE)
         df$version <- factor( df$version, levels = df$version )
 
         chart <- bar_chart(df, x = version, y = count, sort = FALSE) +
-          geom_text(aes(label = count, hjust = -0.2))
+          geom_text(aes(label = count, hjust = -0.2)) +
+          labs( caption = paste(
+            "Prepared on",
+            format_iso_8601(Sys.time()),
+            output_plot_caption) )
 
         print(paste('Plotting to file', output_plot_file))
         ggsave(plot = chart,
