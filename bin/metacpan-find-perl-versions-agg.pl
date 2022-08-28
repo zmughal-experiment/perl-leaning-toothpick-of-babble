@@ -53,6 +53,13 @@ sub main() {
     map version->parse("v5.$_.0"),
     grep $_ % 2 == 0, 0..$last_stable;
 
+  # Add some specific versions that are common minimum versions in order to
+  # split buckets apart.
+  push @versions, version->parse('v5.6.2');
+  push @versions, version->parse('v5.8.1');
+  push @versions, version->parse('v5.8.5');
+  push @versions, version->parse('v5.8.9');
+  push @versions, version->parse('v5.10.1');
 
   my %perlbrew;
   if( $ADD_PERLBREW ) {
