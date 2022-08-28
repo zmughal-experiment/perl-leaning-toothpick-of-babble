@@ -35,7 +35,7 @@ sub main() {
   my $module = 'perl';
   my $ADD_PERLBREW = 0;
   my $PLOT_VERSIONS = 1;
-  my $work_dir = path('work');
+  my $work_dir = path('work', path($0)->basename('.pl'));
 
   my $agg = $cache->compute( "query_for_version_agg-$module", {}, sub {
     my $result = es()->search(
@@ -88,10 +88,11 @@ sub main() {
 
   p %version_buckets;
   if( $PLOT_VERSIONS ) {
-    my $csv_file = $work_dir->child('vb.csv');
+    my $vb_basename = 'version-buckets';
+    my $csv_file = $work_dir->child("${vb_basename}.csv");
     my $plot_device = 'png'; # png, svg
     my $plot_file = $work_dir->child(
-      'vb' .
+      $vb_basename .
         ( $plot_device eq 'png' ? '.png'
         : $plot_device eq 'svg' ? '.svg'
         : '.out'
