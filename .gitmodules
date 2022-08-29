@@ -8,5 +8,5 @@
 	branch = main
 [submodule "metacpan-examples"]
 	path = vendor/metacpan-examples
-	url = https://github.com/metacpan/metacpan-examples
+	url = https://github.com/metacpan/metacpan-examples.git
 	branch = master
