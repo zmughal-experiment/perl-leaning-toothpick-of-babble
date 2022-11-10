@@ -20,18 +20,18 @@ export -f BABBLE_FILTER
 #
 # tar with support for --strip-components (e.g., GNU tar, bsdtar)
 for dist_module in \
-			Getopt::Long::Descriptive \
-			App::Cmd \
-			Mixin::Linewise \
-			Dist::Zilla \
-			Perl::PrereqScanner \
-			String::Formatter \
-			MooseX::OneArgNew \
-			Role::Identifiable \
-			MooseX::SetOnce \
-			Config::MVP \
-			Config::MVP::Reader::INI \
-			CPAN::Uploader \
+			Getopt::Long::Descriptive@0.110 \
+			App::Cmd@0.334 \
+			Mixin::Linewise@0.110 \
+			Dist::Zilla@6.025 \
+			Perl::PrereqScanner@1.024 \
+			String::Formatter@1.234 \
+			MooseX::OneArgNew@0.006 \
+			Role::Identifiable@0.008 \
+			MooseX::SetOnce@0.201 \
+			Config::MVP@2.200012 \
+			Config::MVP::Reader::INI@2.101464 \
+			CPAN::Uploader@0.103016 \
 		; do
 	dist=work/$(echo $dist_module | sed 's/::/-/g; s/@.*$//' )
 
