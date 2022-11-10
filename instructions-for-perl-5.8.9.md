@@ -2,7 +2,6 @@ Using a modern Perl:
 
 ```
 # need git, perl, sponge, find, sed, xargs, parallel,
-cpanm Git::CPAN::Patch
 ./setup.sh
 ```
 

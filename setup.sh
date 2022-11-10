@@ -4,6 +4,8 @@ CURDIR=`dirname "$0"`
 
 export PERL5LIB="vendor/Babble/lib:vendor/PPP/lib"
 
+METACPAN_DOWNLOAD_URL_BASE="https://fastapi.metacpan.org/v1/download_url/"
+
 BABBLE_FILTER() {
 	PLUGINS="$1"; shift
 	FILE="$1"; shift
@@ -14,7 +16,9 @@ export -f BABBLE_FILTER
 
 # requires
 # git, perl, sponge, find, sed, xargs, parallel
-# cpanm Git::CPAN::Patch Babble
+# cpanm Babble
+#
+# tar with support for --strip-components (e.g., GNU tar, bsdtar)
 for dist_module in \
 			Getopt::Long::Descriptive \
 			App::Cmd \
@@ -29,11 +33,16 @@ for dist_module in \
 			Config::MVP::Reader::INI \
 			CPAN::Uploader \
 		; do
-	dist=work/$(echo $dist_module | sed 's/::/-/g' )
+	dist=work/$(echo $dist_module | sed 's/::/-/g; s/@.*$//' )
 
 	TAG='base';
 	if [ ! -d $dist ]; then
-		git-cpan clone --latest --norepository $dist_module $dist
+		DOWNLOAD_URL_REQ=$METACPAN_DOWNLOAD_URL_BASE/$( echo $dist_module | sed 's/@/?version===/' )
+		TARBALL_URL=$(curl $DOWNLOAD_URL_REQ | jq -r .download_url)
+		git init $dist
+		curl $TARBALL_URL | tar -C $dist --strip-components 1 -xvzf -
+		git -C $dist add -v --all --force .
+		git -C $dist commit -m "initial import of $dist_module"
 		git -C $dist tag $TAG
 	else
 		if [ -f $dist/Makefile ]; then make -C $dist clean; fi
