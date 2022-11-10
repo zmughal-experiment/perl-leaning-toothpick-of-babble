@@ -38,11 +38,11 @@ for dist_module in \
 	TAG='base';
 	if [ ! -d $dist ]; then
 		DOWNLOAD_URL_REQ=$METACPAN_DOWNLOAD_URL_BASE/$( echo $dist_module | sed 's/@/?version===/' )
-		TARBALL_URL=$(curl $DOWNLOAD_URL_REQ | jq -r .download_url)
-		git init $dist
-		curl $TARBALL_URL | tar -C $dist --strip-components 1 -xvzf -
-		git -C $dist add -v --all --force .
-		git -C $dist commit -m "initial import of $dist_module"
+		TARBALL_URL=$(curl -s $DOWNLOAD_URL_REQ | jq -r .download_url)
+		git init -q $dist
+		curl -s $TARBALL_URL | tar -C $dist --strip-components 1 -xzf -
+		git -C $dist add --all --force .
+		git -C $dist commit -q -m "initial import of $dist_module"
 		git -C $dist tag $TAG
 	else
 		if [ -f $dist/Makefile ]; then make -C $dist clean; fi
