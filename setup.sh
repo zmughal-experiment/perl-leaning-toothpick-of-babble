@@ -16,7 +16,7 @@ export -f BABBLE_FILTER
 
 # requires
 # git, perl, sponge, find, sed, xargs, parallel
-# cpanm Babble
+# cpanm Babble Pod::Strip
 #
 # tar with support for --strip-components (e.g., GNU tar, bsdtar)
 for dist_module in \
