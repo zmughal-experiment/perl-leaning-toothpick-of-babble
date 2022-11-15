@@ -2,7 +2,7 @@
 
 CURDIR=`dirname "$0"`
 
-export PERL5LIB="vendor/Babble/lib:vendor/PPP/lib"
+export PERL5LIB="vendor/Babble/lib:vendor/PPP/lib:$PERL5LIB"
 
 METACPAN_DOWNLOAD_URL_BASE="https://fastapi.metacpan.org/v1/download_url/"
 
