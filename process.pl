@@ -147,35 +147,35 @@ package Process {
 
 			{
 				my $TAG = 'base';
-				if( ! -d $dist_dir ) {
-					print "Downloading @{[ $dist->url ]}\n";
-					system(qw(git init -q), $dist_dir);
+				if( ! -d $ctx->{dist_dir} ) {
+					print "Downloading @{[ $ctx->{dist}->url ]}\n";
+					system(qw(git init -q), $ctx->{dist_dir});
 					{
-						local $ENV{E_TARBALL_URL} = $dist->url;
-						local $ENV{E_dist_dir} = "$dist_dir";
+						local $ENV{E_TARBALL_URL} = $ctx->{dist}->url;
+						local $ENV{E_dist_dir} = "$ctx->{dist_dir}";
 						system 'curl -s "$E_TARBALL_URL" | tar -C "$E_dist_dir" --strip-components 1 -xzf -';
 					}
 					{
-						local $CWD = "$dist_dir";
+						local $CWD = "$ctx->{dist_dir}";
 						system qw(git add --all --force .);
-						system qw(git commit -q -m), "initial import of @{[ $dist->main_module_name ]}";
+						system qw(git commit -q -m), "initial import of @{[ $ctx->{dist}->main_module_name ]}";
 						system qw(git tag), $TAG;
 					}
 				} else {
-					if( -f $dist_dir->child('Makefile') ) {
-						system qw(make -C), $dist_dir, qw(clean);
+					if( -f $ctx->{dist_dir}->child('Makefile') ) {
+						system qw(make -C), $ctx->{dist_dir}, qw(clean);
 					}
 					{
-						local $CWD = "$dist_dir";
+						local $CWD = "$ctx->{dist_dir}";
 						system qw(git checkout main);
 						system qw(git reset --hard), $TAG;
 					}
 				}
 			}
 
-			my @FIND_FILES = $rule->in( $dist_dir );
-			my @ALL_PERL_FILES = $all_perl_rule->in($dist_dir);
-			my @EUMM_FILES = $eumm_rule->in($dist_dir);
+			my @FIND_FILES = $rule->in( $ctx->{dist_dir} );
+			my @ALL_PERL_FILES = $all_perl_rule->in($ctx->{dist_dir});
+			my @EUMM_FILES = $eumm_rule->in($ctx->{dist_dir});
 
 			{
 				# Removing POD
@@ -192,7 +192,7 @@ package Process {
 					});
 				}
 				{
-					local $CWD = "$dist_dir";
+					local $CWD = "$ctx->{dist_dir}";
 					system qw(git add .);
 					system qw(git commit -q -m), 'Remove POD', '--allow-empty';
 					system qw(git tag -f), $TAG;
@@ -219,7 +219,7 @@ package Process {
 					path($file)->edit_lines(sub { s/^ .* MIN_PERL_VERSION .* $/#$&/x });
 				}
 				{
-					local $CWD = "$dist_dir";
+					local $CWD = "$ctx->{dist_dir}";
 					system qw(git add .);
 					system qw(git commit -q -m), 'Remove explicit use Perl version / extra features', '--allow-empty';
 					system qw(git tag -f), $TAG;
@@ -251,7 +251,7 @@ package Process {
 					}
 				);
 				{
-					local $CWD = "$dist_dir";
+					local $CWD = "$ctx->{dist_dir}";
 					system qw(git add .);
 					system qw(git commit -q -m), "Apply Babble plugin $plugin", '--allow-empty';
 					system qw(git tag -f), $TAG;
@@ -260,15 +260,15 @@ package Process {
 			}
 
 			{
-				local $CWD = "$dist_dir";
+				local $CWD = "$ctx->{dist_dir}";
 				system qw(git tag -f), 'pre-extra-pass';
 			}
 
 			{
 				my $TAG = 'extra-pass';
-				local $CWD = "$dist_dir";
+				local $CWD = "$ctx->{dist_dir}";
 				#system qw(git reset --hard), 'pre-extra-pass';
-				my $eval = $config->{ $dist->main_module_name }{eval};
+				my $eval = $config->{ $ctx->{dist}->main_module_name }{eval};
 				if( $eval ) {
 					eval $eval;
 					system qw(git commit -q -m), 'Apply extra pass', '--allow-empty';
