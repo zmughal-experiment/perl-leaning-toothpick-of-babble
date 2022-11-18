@@ -54,6 +54,8 @@ package Dist {
 };
 
 package Process {
+	use feature qw{ postderef };
+	use experimental qw{ postderef };
 	use Mu;
 	use PerlX::Maybe;
 	use Env qw(@PERL5LIB);
@@ -83,10 +85,6 @@ package Process {
 	ro 'config_path';
 
 	lazy work_dir => sub { path($FindBin::Bin, 'work') };
-
-	sub fetch_or_reset {
-		my ($self, $dist) = @_;
-	}
 
 	sub get_plugin {
 		my ($plugin_name, $grammar) = @_;
@@ -143,121 +141,21 @@ package Process {
 			my $ctx = {
 				dist => $dist,
 				dist_dir => $dist_dir,
+				mce => $mce,
+				grammar => $grammar,
+				plugins => \@plugins,
+				plugin_cache => \%plugin_cache,
 			};
 
-			{
-				my $TAG = 'base';
-				if( ! -d $ctx->{dist_dir} ) {
-					print "Downloading @{[ $ctx->{dist}->url ]}\n";
-					system(qw(git init -q), $ctx->{dist_dir});
-					{
-						local $ENV{E_TARBALL_URL} = $ctx->{dist}->url;
-						local $ENV{E_dist_dir} = "$ctx->{dist_dir}";
-						system 'curl -s "$E_TARBALL_URL" | tar -C "$E_dist_dir" --strip-components 1 -xzf -';
-					}
-					{
-						local $CWD = "$ctx->{dist_dir}";
-						system qw(git add --all --force .);
-						system qw(git commit -q -m), "initial import of @{[ $ctx->{dist}->main_module_name ]}";
-						system qw(git tag), $TAG;
-					}
-				} else {
-					if( -f $ctx->{dist_dir}->child('Makefile') ) {
-						system qw(make -C), $ctx->{dist_dir}, qw(clean);
-					}
-					{
-						local $CWD = "$ctx->{dist_dir}";
-						system qw(git checkout main);
-						system qw(git reset --hard), $TAG;
-					}
-				}
-			}
+			$self->step_fetch($ctx);
 
-			my @FIND_FILES = $rule->in( $ctx->{dist_dir} );
-			my @ALL_PERL_FILES = $all_perl_rule->in($ctx->{dist_dir});
-			my @EUMM_FILES = $eumm_rule->in($ctx->{dist_dir});
+			$ctx->{FIND_FILES}->@* = $rule->in( $ctx->{dist_dir} );
+			$ctx->{ALL_PERL_FILES}->@* = $all_perl_rule->in($ctx->{dist_dir});
+			$ctx->{EUMM_FILES}->@* = $eumm_rule->in($ctx->{dist_dir});
 
-			{
-				# Removing POD
-				my $TAG = 'pod';
-				for my $file (@FIND_FILES) {
-					next if $file =~ m,/t/|/corpus/,;
-					path($file)->edit(sub {
-						s/^ \#pod \N*? \n//xmsg;
-						my $p = Pod::Strip->new;
-						my $podless;
-						$p->output_string( \$podless );
-						$p->parse_string_document( $_ );
-						$_ = $podless;
-					});
-				}
-				{
-					local $CWD = "$ctx->{dist_dir}";
-					system qw(git add .);
-					system qw(git commit -q -m), 'Remove POD', '--allow-empty';
-					system qw(git tag -f), $TAG;
-				}
-			}
-
-			{
-				# Removing Perl version...
-				my $TAG = 'perl-version';
-				use version;
-				my $min = version->parse('v5.8.0');
-				for my $file (@ALL_PERL_FILES) {
-					next if $file =~ m,/corpus/,;
-					path($file)->edit_lines(sub {
-						s{^use \s+ (v?5[.0-9]*) \s* ; $}{
-							(version->parse($1) > $min ? "#" : "") . $&
-						}xe
-					} );
-				}
-				for my $file (@ALL_PERL_FILES) {
-					path($file)->edit_lines(sub { s/^ no \s+ feature \s+ 'switch'; \s* $/#$&/x } );
-				}
-				for my $file (@EUMM_FILES) {
-					path($file)->edit_lines(sub { s/^ .* MIN_PERL_VERSION .* $/#$&/x });
-				}
-				{
-					local $CWD = "$ctx->{dist_dir}";
-					system qw(git add .);
-					system qw(git commit -q -m), 'Remove explicit use Perl version / extra features', '--allow-empty';
-					system qw(git tag -f), $TAG;
-				}
-			}
-
-			for my $plugin ( @plugins ) {
-				my $TAG = "babble-@{[ $plugin =~ s/::/-/gr ]}";
-				my $progress_bar = Term::ProgressBar->new({
-					count => 0+@ALL_PERL_FILES,
-					name  => $plugin,
-				});
-				my $pc;
-				$mce->foreach(\@ALL_PERL_FILES,
-					{
-						progress => $progress_bar->curry::update,
-						user_begin => sub {
-							my $p = $plugin_cache{$plugin};
-							$pc = Babble::PluginChain->new( plugins => [ $p ], grammar => $grammar );
-						},
-					},
-					sub {
-						my ($mce, $chunk_ref, $chunk_id) = @_;
-						return if $chunk_ref->[0] =~ m,/corpus/,;
-						my $file = path($chunk_ref->[0]);
-						$file->edit(sub {
-							$_ = $pc->transform_document($_);
-						});
-					}
-				);
-				{
-					local $CWD = "$ctx->{dist_dir}";
-					system qw(git add .);
-					system qw(git commit -q -m), "Apply Babble plugin $plugin", '--allow-empty';
-					system qw(git tag -f), $TAG;
-					system qw(git -P show --format= --shortstat), $TAG;
-				}
-			}
+			$self->step_remove_pod($ctx);
+			$self->step_remove_version($ctx);
+			$self->step_babble($ctx);
 
 			{
 				local $CWD = "$ctx->{dist_dir}";
@@ -276,6 +174,127 @@ package Process {
 				}
 			}
 		}
+	}
+
+	sub step_fetch {
+		my ($self, $ctx) = @_;
+
+		my $TAG = 'base';
+		if( ! -d $ctx->{dist_dir} ) {
+			print "Downloading @{[ $ctx->{dist}->url ]}\n";
+			system(qw(git init -q), $ctx->{dist_dir});
+			{
+				local $ENV{E_TARBALL_URL} = $ctx->{dist}->url;
+				local $ENV{E_dist_dir} = "$ctx->{dist_dir}";
+				system 'curl -s "$E_TARBALL_URL" | tar -C "$E_dist_dir" --strip-components 1 -xzf -';
+			}
+			{
+				local $CWD = "$ctx->{dist_dir}";
+				system qw(git add --all --force .);
+				system qw(git commit -q -m), "initial import of @{[ $ctx->{dist}->main_module_name ]}";
+				system qw(git tag), $TAG;
+			}
+		} else {
+			if( -f $ctx->{dist_dir}->child('Makefile') ) {
+				system qw(make -C), $ctx->{dist_dir}, qw(clean);
+			}
+			{
+				local $CWD = "$ctx->{dist_dir}";
+				system qw(git checkout main);
+				system qw(git reset --hard), $TAG;
+			}
+		}
+	}
+
+	sub step_remove_pod {
+		my ($self, $ctx) = @_;
+
+		# Removing POD
+		my $TAG = 'pod';
+		for my $file ($ctx->{FIND_FILES}->@*) {
+			next if $file =~ m,/t/|/corpus/,;
+			path($file)->edit(sub {
+				s/^ \#pod \N*? \n//xmsg;
+				my $p = Pod::Strip->new;
+				my $podless;
+				$p->output_string( \$podless );
+				$p->parse_string_document( $_ );
+				$_ = $podless;
+			});
+		}
+		{
+			local $CWD = "$ctx->{dist_dir}";
+			system qw(git add .);
+			system qw(git commit -q -m), 'Remove POD', '--allow-empty';
+			system qw(git tag -f), $TAG;
+		}
+	}
+
+	sub step_remove_version {
+		my ($self, $ctx) = @_;
+
+		# Removing Perl version...
+		my $TAG = 'perl-version';
+		use version;
+		my $min = version->parse('v5.8.0');
+		for my $file ($ctx->{ALL_PERL_FILES}->@*) {
+			next if $file =~ m,/corpus/,;
+			path($file)->edit_lines(sub {
+				s{^use \s+ (v?5[.0-9]*) \s* ; $}{
+					(version->parse($1) > $min ? "#" : "") . $&
+				}xe
+			} );
+		}
+		for my $file ($ctx->{ALL_PERL_FILES}->@*) {
+			path($file)->edit_lines(sub { s/^ no \s+ feature \s+ 'switch'; \s* $/#$&/x } );
+		}
+		for my $file ($ctx->{EUMM_FILES}->@*) {
+			path($file)->edit_lines(sub { s/^ .* MIN_PERL_VERSION .* $/#$&/x });
+		}
+		{
+			local $CWD = "$ctx->{dist_dir}";
+			system qw(git add .);
+			system qw(git commit -q -m), 'Remove explicit use Perl version / extra features', '--allow-empty';
+			system qw(git tag -f), $TAG;
+		}
+	}
+
+	sub step_babble {
+		my ($self, $ctx) = @_;
+
+		for my $plugin ( $ctx->{plugins}->@* ) {
+			my $TAG = "babble-@{[ $plugin =~ s/::/-/gr ]}";
+			my $progress_bar = Term::ProgressBar->new({
+				count => 0+$ctx->{ALL_PERL_FILES}->@*,
+				name  => $plugin,
+			});
+			my $pc;
+			$ctx->{mce}->foreach($ctx->{ALL_PERL_FILES},
+				{
+					progress => $progress_bar->curry::update,
+					user_begin => sub {
+						my $p = $ctx->{plugin_cache}{$plugin};
+						$pc = Babble::PluginChain->new( plugins => [ $p ], grammar => $ctx->{grammar} );
+					},
+				},
+				sub {
+					my ($mce, $chunk_ref, $chunk_id) = @_;
+					return if $chunk_ref->[0] =~ m,/corpus/,;
+					my $file = path($chunk_ref->[0]);
+					$file->edit(sub {
+						$_ = $pc->transform_document($_);
+					});
+				}
+			);
+			{
+				local $CWD = "$ctx->{dist_dir}";
+				system qw(git add .);
+				system qw(git commit -q -m), "Apply Babble plugin $plugin", '--allow-empty';
+				system qw(git tag -f), $TAG;
+				system qw(git -P show --format= --shortstat), $TAG;
+			}
+		}
+
 	}
 }
 
