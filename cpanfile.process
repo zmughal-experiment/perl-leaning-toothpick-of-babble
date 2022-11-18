@@ -13,5 +13,6 @@ requires 'Path::Tiny';
 requires 'PerlX::Maybe';
 requires 'Pod::Strip';
 requires 'Term::ProgressBar';
+requires 'With::Roles';
 requires 'autodie';
 requires 'curry';

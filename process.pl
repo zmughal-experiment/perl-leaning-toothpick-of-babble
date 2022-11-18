@@ -78,6 +78,7 @@ package Process {
 	use curry;
 	use Term::ProgressBar;
 	use Babble::PluginChain;
+	use With::Roles;
 
 	ro 'config_path';
 
@@ -111,21 +112,8 @@ package Process {
 			);
 		}
 
-		my @plugins =  sort keys %{ $config->{-plugins=>} };
+		my @plugins =  sort map { my $p = $_; grep { $p->{$_} } keys %$p } $config->{-plugins=>};
 
-		my $babble_filter = <<'BASH';
-BABBLE_FILTER() {
-	PLUGINS="$1"; shift
-	FILE="$1"; shift
-	perl -MBabble::Filter="$PLUGINS" \
-		 -0777 -pe babble $FILE | sponge $FILE
-}
-export -f BABBLE_FILTER
-
-BASH
-		do {
-		local $ENV{PERL5LIB} = $ENV{PERL5LIB};
-		unshift @PERL5LIB, @main::VENDOR_LIB;
 		die "Need git" unless which('git');
 		die "Need curl" unless which('curl');
 		die "Need make" unless which('make');
@@ -149,6 +137,7 @@ BASH
 			#chunk_size => 64,
 		);
 
+		DIST:
 		for my $dist (@dists) {
 			local $ENV{TARBALL_URL} = $dist->url;
 			local $ENV{dist_module} = my $dist_module = $dist->main_module_name;
@@ -211,9 +200,15 @@ BASH
 			{
 				# Removing Perl version...
 				my $TAG = 'perl-version';
+				use version;
+				my $min = version->parse('v5.8.0');
 				for my $file (@ALL_PERL_FILES) {
 					next if $file =~ m,/corpus/,;
-					path($file)->edit_lines(sub { s/^use \s+ v?5[.0-9]* \s* ; $/#$&/x } );
+					path($file)->edit_lines(sub {
+						s{^use \s+ (v?5[.0-9]*) \s* ; $}{
+							(version->parse($1) > $min ? "#" : "") . $&
+						}xe
+					} );
 				}
 				for my $file (@ALL_PERL_FILES) {
 					path($file)->edit_lines(sub { s/^ no \s+ feature \s+ 'switch'; \s* $/#$&/x } );
@@ -261,25 +256,25 @@ BASH
 					system qw(git -P show --format= --shortstat), $TAG;
 				}
 			}
+
+			{
+				local $CWD = "$dist_dir";
+				system qw(git tag -f), 'pre-extra-pass';
+			}
+
+			{
+				my $TAG = 'extra-pass';
+				local $CWD = "$dist_dir";
+				#system qw(git reset --hard), 'pre-extra-pass';
+				my $eval = $config->{ $dist->main_module_name }{eval};
+				if( $eval ) {
+					eval $eval;
+					system qw(git commit -q -m), 'Apply extra pass', '--allow-empty';
+					system qw(git tag -f), $TAG;
+				}
+			}
 		}
-
-		system(qw(bash -c), $babble_filter . <<'BASH') if 1;
-
-perl -pi -e 's/"feature" =>/#$&/' work/Dist-Zilla/Makefile.PL
-BABBLE_FILTER ::DefinedOr,::PostfixDeref  work/Dist-Zilla/t/plugins/archive_builder.t
-BABBLE_FILTER ::DefinedOr  work/Dist-Zilla/t/plugins/cpanfile.t
-perl -MBabble::Grammar -MRole::Tiny -MBabble::Filter=::DefinedOr -0777 -pe 'Role::Tiny->apply_roles_to_package( qw(Babble::Grammar), qw(PPP::Babble::Grammar::Role::TryTiny) ); babble' work/Dist-Zilla/lib/Dist/Zilla.pm | sponge work/Dist-Zilla/lib/Dist/Zilla.pm
-perl -MBabble::Grammar -MRole::Tiny -MBabble::Filter=::PostfixDeref -0777 -pe 'Role::Tiny->apply_roles_to_package( qw(Babble::Grammar), qw(PPP::Babble::Grammar::Role::TryTiny) ); babble' work/Dist-Zilla/lib/Dist/Zilla/Dist/Builder.pm | sponge work/Dist-Zilla/lib/Dist/Zilla/Dist/Builder.pm
-git -C work/Dist-Zilla add . && git -C work/Dist-Zilla commit -q -m 'Apply extra' --allow-empty
-git -C work/Dist-Zilla tag -f extra-pass
-
-perl -pi -e 's/^#(\Quse 5.008;\E)$/$1/' work/Perl-PrereqScanner/lib/Perl/PrereqScanner.pm
-git -C work/Perl-PrereqScanner add . && git -C work/Perl-PrereqScanner commit -q -m 'Apply extra' --allow-empty
-git -C work/Perl-PrereqScanner tag -f extra-pass
-BASH
-
-		};
-	};
+	}
 }
 
 
