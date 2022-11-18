@@ -54,8 +54,6 @@ package Dist {
 };
 
 package Process {
-	use feature qw{ postderef };
-	use experimental qw{ postderef };
 	use Mu;
 	use PerlX::Maybe;
 	use Env qw(@PERL5LIB);
@@ -149,9 +147,9 @@ package Process {
 
 			$self->step_fetch($ctx);
 
-			$ctx->{FIND_FILES}->@* = $rule->in( $ctx->{dist_dir} );
-			$ctx->{ALL_PERL_FILES}->@* = $all_perl_rule->in($ctx->{dist_dir});
-			$ctx->{EUMM_FILES}->@* = $eumm_rule->in($ctx->{dist_dir});
+			@{$ctx->{FIND_FILES}} = $rule->in( $ctx->{dist_dir} );
+			@{$ctx->{ALL_PERL_FILES}} = $all_perl_rule->in($ctx->{dist_dir});
+			@{$ctx->{EUMM_FILES}} = $eumm_rule->in($ctx->{dist_dir});
 
 			$self->step_remove_pod($ctx);
 			$self->step_remove_version($ctx);
@@ -211,7 +209,7 @@ package Process {
 
 		# Removing POD
 		my $TAG = 'pod';
-		for my $file ($ctx->{FIND_FILES}->@*) {
+		for my $file (@{$ctx->{FIND_FILES}}) {
 			next if $file =~ m,/t/|/corpus/,;
 			path($file)->edit(sub {
 				s/^ \#pod \N*? \n//xmsg;
@@ -237,7 +235,7 @@ package Process {
 		my $TAG = 'perl-version';
 		use version;
 		my $min = version->parse('v5.8.0');
-		for my $file ($ctx->{ALL_PERL_FILES}->@*) {
+		for my $file (@{$ctx->{ALL_PERL_FILES}}) {
 			next if $file =~ m,/corpus/,;
 			path($file)->edit_lines(sub {
 				s{^use \s+ (v?5[.0-9]*) \s* ; $}{
@@ -245,10 +243,10 @@ package Process {
 				}xe
 			} );
 		}
-		for my $file ($ctx->{ALL_PERL_FILES}->@*) {
+		for my $file (@{$ctx->{ALL_PERL_FILES}}) {
 			path($file)->edit_lines(sub { s/^ no \s+ feature \s+ 'switch'; \s* $/#$&/x } );
 		}
-		for my $file ($ctx->{EUMM_FILES}->@*) {
+		for my $file (@{$ctx->{EUMM_FILES}}) {
 			path($file)->edit_lines(sub { s/^ .* MIN_PERL_VERSION .* $/#$&/x });
 		}
 		{
@@ -262,10 +260,10 @@ package Process {
 	sub step_babble {
 		my ($self, $ctx) = @_;
 
-		for my $plugin ( $ctx->{plugins}->@* ) {
+		for my $plugin ( @{$ctx->{plugins}} ) {
 			my $TAG = "babble-@{[ $plugin =~ s/::/-/gr ]}";
 			my $progress_bar = Term::ProgressBar->new({
-				count => 0+$ctx->{ALL_PERL_FILES}->@*,
+				count => 0+@{$ctx->{ALL_PERL_FILES}},
 				name  => $plugin,
 			});
 			my $pc;
