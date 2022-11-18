@@ -1,0 +1,17 @@
+requires 'Config::INI::Reader::Multiline';
+requires 'File::Find::Rule';
+requires 'File::Find::Rule::Perl';
+requires 'File::Which';
+requires 'File::chdir';
+requires 'IO::Socket::SSL';
+requires 'IPC::System::Simple';
+requires 'MCE';
+requires 'Module::Runtime';
+requires 'Mojo::UserAgent';
+requires 'Mu';
+requires 'Path::Tiny';
+requires 'PerlX::Maybe';
+requires 'Pod::Strip';
+requires 'Term::ProgressBar';
+requires 'autodie';
+requires 'curry';
