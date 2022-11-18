@@ -114,9 +114,7 @@ package Process {
 
 		my @plugins =  sort map { my $p = $_; grep { $p->{$_} } keys %$p } $config->{-plugins=>};
 
-		die "Need git" unless which('git');
-		die "Need curl" unless which('curl');
-		die "Need make" unless which('make');
+		for my $bin (qw(git curl make)) { die "Need $bin" unless which($bin); }
 		die "Need tar with support for --strip-components (e.g., GNU tar, bsdtar)" unless which('tar');
 
 		my $rule =  File::Find::Rule->or(
@@ -139,24 +137,28 @@ package Process {
 
 		DIST:
 		for my $dist (@dists) {
-			local $ENV{TARBALL_URL} = $dist->url;
-			local $ENV{dist_module} = my $dist_module = $dist->main_module_name;
-
 			my $dist_dir = $self->work_dir->child(
 				$dist->main_module_name =~ s/::/-/gr
 			);
-			local $ENV{dist_dir} = "$dist_dir";
+			my $ctx = {
+				dist => $dist,
+				dist_dir => $dist_dir,
+			};
 
 			{
 				my $TAG = 'base';
 				if( ! -d $dist_dir ) {
 					print "Downloading @{[ $dist->url ]}\n";
 					system(qw(git init -q), $dist_dir);
-					system 'curl -s $TARBALL_URL | tar -C $dist_dir --strip-components 1 -xzf -';
+					{
+						local $ENV{E_TARBALL_URL} = $dist->url;
+						local $ENV{E_dist_dir} = "$dist_dir";
+						system 'curl -s "$E_TARBALL_URL" | tar -C "$E_dist_dir" --strip-components 1 -xzf -';
+					}
 					{
 						local $CWD = "$dist_dir";
 						system qw(git add --all --force .);
-						system qw(git commit -q -m), "initial import of $dist_module";
+						system qw(git commit -q -m), "initial import of @{[ $dist->main_module_name ]}";
 						system qw(git tag), $TAG;
 					}
 				} else {
