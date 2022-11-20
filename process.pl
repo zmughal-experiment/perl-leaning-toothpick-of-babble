@@ -84,6 +84,40 @@ package Process {
 
 	lazy work_dir => sub { path($FindBin::Bin, 'work') };
 
+	my %plugin_cache_warm_seeds = (
+		'::PackageBlock'        => q[
+			package Foo { 42 }
+		],
+		'::PackageVersion'      => q[
+			package Foo v1.0;
+			package Bar v1.0 { 42 }
+		],
+		'::DefinedOr'           => q[
+			my $var //= 1;
+			$var // 1;
+			$var->{bar} //= 1 unless $var->{foo};
+		],
+		'::PostfixDeref'        => q[
+			use experimental qw(postderef);
+			use feature      qw(postderef);
+
+			$data->{foo}->@*;
+			"$ref->$*";
+		],
+		'::State'               => q[
+			use feature      qw(state);
+			sub foo {
+				state $var = 1;
+			}
+		],
+		'::SubstituteAndReturn' => q[
+			$var =~ s/re/place/r =~ tr/a-z/A-Z/r;
+		],
+		'::Ellipsis'            => q[
+			...
+		],
+	);
+
 	sub get_plugin {
 		my ($plugin_name, $grammar) = @_;
 		$grammar ||= Babble::Grammar->new;
@@ -123,8 +157,12 @@ package Process {
 		my %plugin_cache;
 		my $grammar = Babble::Grammar->new;
 		@plugin_cache{@plugins} = map get_plugin($_, $grammar), @plugins;
-		my $blank_top = $grammar->match(Document => '');
-		$_->transform_to_plain($blank_top) for values %plugin_cache;
+		if( $ENV{BABBLE_WARM_CACHE} ) {
+			for my $name (sort keys %plugin_cache) {
+				my $seed = $grammar->match(Document => $plugin_cache_warm_seeds{$name} || '');
+				$plugin_cache{$name}->transform_to_plain($seed);
+			}
+		}
 
 		my $mce = MCE->new(
 			max_workers => 4,
