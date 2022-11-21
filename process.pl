@@ -94,6 +94,7 @@ package Process {
 		],
 		'::DefinedOr'           => q[
 			my $var //= 1;
+			$var //= 1 ? 2 : 3;
 			$var // 1;
 			$var->{bar} //= 1 unless $var->{foo};
 		],
@@ -109,9 +110,15 @@ package Process {
 			sub foo {
 				state $var = 1;
 			}
+
+			my $foo = sub {
+				state $var = 1;
+			};
 		],
 		'::SubstituteAndReturn' => q[
 			$var =~ s/re/place/r =~ tr/a-z/A-Z/r;
+			s/re/place/r;
+			y/a-z/A-Z/r;
 		],
 		'::Ellipsis'            => q[
 			...
