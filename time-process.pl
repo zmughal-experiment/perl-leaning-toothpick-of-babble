@@ -24,12 +24,12 @@ sub main {
 	die "$time_path is not GNU time" unless `$time_path --version` =~ /GNU Time/s;
 
 	my $permute = permute_named_iter(
-		cache           => [ map boolean($_), 0..1 ],
-		match_pos_cache => [ map boolean($_), 0..1 ],
-		bail_out_early  => [ map boolean($_), 0..1 ],
-		bail_out_late   => [ map boolean($_), 0..1 ],
+		cache           => [ map boolean($_), 1 ],
+		match_pos_cache => [ map boolean($_), 1 ],
+		bail_out_early  => [ map boolean($_), 1 ],
+		bail_out_late   => [ map boolean($_), 1 ],
 		warm_cache      => [ map boolean($_), 0..1 ],
-		workers         => [ 1, 2, 4, 8 ],
+		workers         => [ 2, 4, 8 ],
 		version         => [
 			'perl-5.18.4@babble',
 			'perl-5.34.0@babble',
