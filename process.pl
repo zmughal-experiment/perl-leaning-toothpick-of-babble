@@ -172,7 +172,7 @@ package Process {
 		}
 
 		my $mce = MCE->new(
-			max_workers => 4,
+			max_workers => exists $ENV{BABBLE_PLUGINS_WORKERS} ? $ENV{BABBLE_PLUGINS_WORKERS} : 4,
 			#chunk_size => 64,
 		);
 
