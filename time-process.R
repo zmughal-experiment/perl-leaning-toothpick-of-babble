@@ -11,17 +11,19 @@ model         <- elapsed ~ version * workers * ( cache * match_pos_cache * warm_
 model.reduced <- elapsed ~ version * workers * ( warm_cache )
 model.reduced.noversion <- elapsed ~ workers * ( warm_cache )
 
-attach(data)
-agg <- aggregate(model, run, mean )
-detach(data)
+attach(data); agg <- aggregate(model, run, mean ); detach(data)
 
-fit <- aov( model.reduced, agg )
+print('model.reduced')
+fit <- aov( model.reduced, data )
 print(fit); print( summary(fit) )
+print('model.reduced coefficients')
+print(as.matrix(sort(coef(fit))), digits=2)
 
-agg.perl534 <- subset(agg, version == 'perl-5.34.0@babble'  )
-print(agg.perl534)
-fit.perl534 <- aov( model.reduced.noversion, agg.perl534 )
+print('model.reduced.noversion')
+data.perl534 <- subset(data, version == 'perl-5.34.0@babble'  )
+fit.perl534 <- aov( model.reduced.noversion, data.perl534 )
 print(fit.perl534); print( summary(fit.perl534) )
 
+print('agg.sort.elapsed')
 agg.sort.elapsed <- agg[order(agg$elapsed),c('version','warm_cache','workers','elapsed')]
 print(agg.sort.elapsed)
