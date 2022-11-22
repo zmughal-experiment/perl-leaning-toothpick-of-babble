@@ -1,9 +1,13 @@
+library(ggplot2)
+library(purrr)
+library(ARTool)
 library(jsonlite)
 data <- fromJSON('timing.json')
 
 data$run <- as.factor(data$run)
 data$version <- as.factor(data$version)
 data$workers <- as.factor(data$workers)
+#print(str(data))#DEBUG
 
 data <- subset( data, select = -c(timing))
 
@@ -11,18 +15,30 @@ model         <- elapsed ~ version * workers * ( cache * match_pos_cache * warm_
 model.reduced <- elapsed ~ version * workers * ( warm_cache )
 model.reduced.noversion <- elapsed ~ workers * ( warm_cache )
 
-attach(data); agg <- aggregate(model, run, mean ); detach(data)
+agg <- aggregate(model, mean, data = data )
+
+# Check equal group variances for ANOVA
+#print(aggregate(model, var, data = data ))
 
 print('model.reduced')
-fit <- aov( model.reduced, data )
-print(fit); print( summary(fit) )
-print('model.reduced coefficients')
-print(as.matrix(sort(coef(fit))), digits=2)
+art.reduced <- art( model.reduced, data )
+fit.reduced <- anova( art.reduced )
+print(fit.reduced)
+
+# Compare with version facet
+plot.bp <- ( ggplot( data,
+       aes( y = elapsed, workers, color = warm_cache  ) )
+	+ geom_boxplot() + facet_wrap( ~ version ) )
+ggsave(plot = plot.bp, filename = 'elapsed-facet-version-boxplot.png', width = 11)
 
 print('model.reduced.noversion')
-data.perl534 <- subset(data, version == 'perl-5.34.0@babble'  )
-fit.perl534 <- aov( model.reduced.noversion, data.perl534 )
-print(fit.perl534); print( summary(fit.perl534) )
+walk( levels(data$version), function(v) {
+	print(v)
+	data.v <- subset(data, version == v  )
+	art.v <- art( model.reduced.noversion, data.v )
+	fit.v <- anova(art.v)
+	print(fit.v);
+})
 
 print('agg.sort.elapsed')
 agg.sort.elapsed <- agg[order(agg$elapsed),c('version','warm_cache','workers','elapsed')]
