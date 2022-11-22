@@ -178,6 +178,7 @@ package Process {
 
 		DIST:
 		for my $dist (@dists) {
+			next DIST if exists $ENV{BABBLE_DIST_ALLOW} && $dist->main_module_name !~ /$ENV{BABBLE_DIST_ALLOW}/;
 			my $dist_dir = $self->work_dir->child(
 				$dist->main_module_name =~ s/::/-/gr
 			);

@@ -37,6 +37,7 @@ sub main {
 		run              => [ 0..$runs-1 ],
 	);
 
+	local $ENV{BABBLE_DIST_ALLOW} = 'Dist::Zilla|App::Cmd';
 	RUN:
 	while (my $p = $permute->()) {
 		local $ENV{PERL_BABBLE_CACHE_RE} = 0 + $p->{cache};
