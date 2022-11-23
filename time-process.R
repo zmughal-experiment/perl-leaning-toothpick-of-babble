@@ -11,14 +11,18 @@ data$workers <- as.factor(data$workers)
 
 data <- subset( data, select = -c(timing))
 
-model         <- elapsed ~ version * workers * ( cache * match_pos_cache * warm_cache + bail_out_early + bail_out_late )
+model         <- elapsed ~ version * workers * ( cache * warm_cache + bail_out_early + bail_out_late )
 model.reduced <- elapsed ~ version * workers * ( warm_cache )
 model.reduced.noversion <- elapsed ~ workers * ( warm_cache )
 
 agg <- aggregate(model, mean, data = data )
 
-# Check equal group variances for ANOVA
-#print(aggregate(model, var, data = data ))
+## Check equal group variances for ANOVA
+#print('elapsed.var'); print(aggregate(model, var, data = data ))
+## Check normality
+#fit.aov <- aov( model.reduced, data )
+#qqnorm( fit.aov$residuals ); qqline( fit.aov$residuals )
+#print(shapiro.test( data$elapsed ))
 
 print('model.reduced')
 art.reduced <- art( model.reduced, data )
